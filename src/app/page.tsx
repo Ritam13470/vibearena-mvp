@@ -1,65 +1,130 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+
+type BattleCard = {
+  name: string;
+  title: string;
+  power: string;
+  weakness: string;
+  score: number;
+};
 
 export default function Home() {
+  const [prompt, setPrompt] = useState("");
+  const [card, setCard] = useState<BattleCard | null>(null);
+
+  function generateBattleCard() {
+    if (!prompt.trim()) {
+      alert("Please describe your character first.");
+      return;
+    }
+
+    const randomScore = Math.floor(Math.random() * 41) + 60;
+
+    const newCard: BattleCard = {
+      name: "Solana Shadow",
+      title: "AI-Born Arena Fighter",
+      power: `Uses ${prompt} energy to dominate the arena.`,
+      weakness: "Gets distracted by meme coins and shiny NFTs.",
+      score: randomScore,
+    };
+
+    setCard(newCard);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen bg-black text-white">
+      <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-16 text-center">
+        <p className="mb-4 rounded-full border border-purple-500/40 bg-purple-500/10 px-4 py-2 text-sm text-purple-200">
+          Consumer Crypto x AI on Solana
+        </p>
+
+        <h1 className="max-w-3xl text-5xl font-bold tracking-tight sm:text-6xl">
+          VibeArena
+        </h1>
+
+        <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-300">
+          Generate AI-powered battle characters, connect your Solana wallet,
+          and share your creations with the world.
+        </p>
+
+        <div className="mt-10 w-full max-w-xl rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-2xl">
+          <label className="mb-3 block text-left text-sm font-medium text-zinc-300">
+            Describe your character
+          </label>
+
+          <textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            className="h-32 w-full resize-none rounded-xl border border-zinc-700 bg-black p-4 text-white outline-none placeholder:text-zinc-500 focus:border-purple-500"
+            placeholder="Example: A cyberpunk tiger warrior powered by Solana lightning..."
+          />
+
+          <button
+            onClick={generateBattleCard}
+            className="mt-4 w-full rounded-xl bg-purple-600 px-5 py-3 font-semibold text-white transition hover:bg-purple-500"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Generate Battle Card
+          </button>
         </div>
-      </main>
-    </div>
+
+        {card && (
+          <div className="mt-10 w-full max-w-xl rounded-3xl border border-purple-500/40 bg-gradient-to-br from-zinc-950 to-purple-950/40 p-6 text-left shadow-2xl">
+            <p className="text-sm text-purple-300">Generated Battle Card</p>
+
+            <h2 className="mt-3 text-3xl font-bold text-white">
+              {card.name}
+            </h2>
+
+            <p className="mt-1 text-zinc-400">{card.title}</p>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-purple-300">Power</p>
+                <p className="mt-1 text-zinc-200">{card.power}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-purple-300">
+                  Weakness
+                </p>
+                <p className="mt-1 text-zinc-200">{card.weakness}</p>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-700 bg-black p-4">
+                <p className="text-sm text-zinc-400">Battle Score</p>
+                <p className="mt-1 text-4xl font-bold text-purple-300">
+                  {card.score}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-10 grid w-full max-w-3xl gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+            <h2 className="font-semibold text-purple-300">AI Generated</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Create characters from simple prompts.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+            <h2 className="font-semibold text-purple-300">Solana Ready</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Wallet connect and crypto features coming next.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+            <h2 className="font-semibold text-purple-300">Shareable</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Turn every generated card into social content.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
