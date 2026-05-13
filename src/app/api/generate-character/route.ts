@@ -1,32 +1,41 @@
 import Groq from "groq-sdk";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-type Rarity = "Common" | "Rare" | "Epic" | "Legendary" | "Mythic";
-
-type VisualType =
-  | "tiger"
-  | "dragon"
-  | "robot"
-  | "waifu"
-  | "agent"
-  | "beast"
-  | "default";
-
-type GeneratedCharacter = {
+type AICharacterResponse = {
   name: string;
   origin: string;
   power: string;
   weakness: string;
   score: number;
-  rarity: Rarity;
+  rarity: "Common" | "Rare" | "Epic" | "Legendary" | "Mythic";
   catchphrase: string;
   rank: number;
-  visualType: VisualType;
+  visualType:
+    | "tiger"
+    | "dragon"
+    | "robot"
+    | "waifu"
+    | "agent"
+    | "beast"
+    | "default";
   imagePrompt: string;
 };
 
-const visualTypes: VisualType[] = [
+type Rarity = AICharacterResponse["rarity"];
+type VisualType = AICharacterResponse["visualType"];
+type GeneratedCharacter = AICharacterResponse;
+
+const rarityValues = new Set<string>([
+  "Common",
+  "Rare",
+  "Epic",
+  "Legendary",
+  "Mythic",
+]);
+
+const visualTypeValues = new Set<string>([
   "tiger",
   "dragon",
   "robot",
@@ -34,7 +43,64 @@ const visualTypes: VisualType[] = [
   "agent",
   "beast",
   "default",
-];
+]);
+
+const stringFields = [
+  "name",
+  "origin",
+  "power",
+  "weakness",
+  "catchphrase",
+  "imagePrompt",
+] as const satisfies readonly (keyof AICharacterResponse)[];
+
+const numberFields = [
+  "score",
+  "rank",
+] as const satisfies readonly (keyof AICharacterResponse)[];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isRarity(value: unknown): value is Rarity {
+  return typeof value === "string" && rarityValues.has(value);
+}
+
+function isVisualType(value: unknown): value is VisualType {
+  return typeof value === "string" && visualTypeValues.has(value);
+}
+
+function isAICharacterResponse(value: unknown): value is AICharacterResponse {
+  if (!isRecord(value)) return false;
+
+  return (
+    stringFields.every((field) => isNonEmptyString(value[field])) &&
+    numberFields.every((field) => isFiniteNumber(value[field])) &&
+    isRarity(value.rarity) &&
+    isVisualType(value.visualType)
+  );
+}
+
+function getCharacterCandidate(value: unknown): unknown {
+  if (isRecord(value) && isRecord(value.character)) {
+    return value.character;
+  }
+
+  return value;
+}
+
+function clampInteger(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
 
 function rarityForScore(score: number): Rarity {
   if (score >= 96) return "Mythic";
@@ -44,138 +110,20 @@ function rarityForScore(score: number): Rarity {
   return "Common";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function getVisualTypeFromPrompt(prompt: string): VisualType {
-  const lowerPrompt = prompt.toLowerCase();
-
-  if (
-    ["tiger", "lion", "panther"].some((keyword) =>
-      lowerPrompt.includes(keyword),
-    )
-  ) {
-    return "tiger";
-  }
-
-  if (lowerPrompt.includes("beast")) return "beast";
-
-  if (
-    ["dragon", "oracle", "mystic"].some((keyword) =>
-      lowerPrompt.includes(keyword),
-    )
-  ) {
-    return "dragon";
-  }
-
-  if (
-    ["robot", "mecha", "cyborg", "android"].some((keyword) =>
-      lowerPrompt.includes(keyword),
-    )
-  ) {
-    return "robot";
-  }
-
-  if (
-    ["waifu", "anime", "companion"].some((keyword) =>
-      lowerPrompt.includes(keyword),
-    )
-  ) {
-    return "waifu";
-  }
-
-  if (
-    ["agent", "bot", "assistant"].some((keyword) =>
-      lowerPrompt.includes(keyword),
-    )
-  ) {
-    return "agent";
-  }
-
-  return "default";
-}
-
-function parseInteger(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.round(value);
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-}
-
-function clampInteger(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
 function normalizeCharacter(
-  value: unknown,
-  prompt: string,
-): GeneratedCharacter | null {
-  const candidate = isRecord(value) && isRecord(value.character)
-    ? value.character
-    : value;
+  character: AICharacterResponse,
+): GeneratedCharacter {
+  const score = clampInteger(character.score, 60, 99);
 
-  if (!isRecord(candidate)) return null;
-
-  if (
-    !isNonEmptyString(candidate.name) ||
-    !isNonEmptyString(candidate.origin) ||
-    !isNonEmptyString(candidate.power) ||
-    !isNonEmptyString(candidate.weakness) ||
-    !isNonEmptyString(candidate.catchphrase) ||
-    !isNonEmptyString(candidate.imagePrompt)
-  ) {
-    return null;
-  }
-
-  const scoreValue = parseInteger(candidate.score);
-  const rankValue = parseInteger(candidate.rank);
-
-  if (scoreValue === null) return null;
-
-  const score = clampInteger(scoreValue, 60, 99);
-  const rank = rankValue === null
-    ? clampInteger(100 - score, 1, 99)
-    : clampInteger(rankValue, 1, 99);
-  const visualType = typeof candidate.visualType === "string" &&
-    visualTypes.includes(candidate.visualType as VisualType)
-    ? candidate.visualType as VisualType
-    : getVisualTypeFromPrompt(prompt);
-
-  return {
-    name: candidate.name.trim(),
-    origin: candidate.origin.trim(),
-    power: candidate.power.trim(),
-    weakness: candidate.weakness.trim(),
-    score,
-    rarity: rarityForScore(score),
-    catchphrase: candidate.catchphrase.trim(),
-    rank,
-    visualType,
-    imagePrompt: candidate.imagePrompt.trim(),
-  };
-}
-
-function cleanCharacter(character: GeneratedCharacter): GeneratedCharacter {
   return {
     name: character.name.trim(),
     origin: character.origin.trim(),
     power: character.power.trim(),
     weakness: character.weakness.trim(),
-    score: character.score,
-    rarity: character.rarity,
+    score,
+    rarity: rarityForScore(score),
     catchphrase: character.catchphrase.trim(),
-    rank: character.rank,
+    rank: clampInteger(character.rank, 1, 99),
     visualType: character.visualType,
     imagePrompt: character.imagePrompt.trim(),
   };
@@ -213,7 +161,10 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Prompt is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Prompt is required." },
+      { status: 400 },
+    );
   }
 
   const prompt = isRecord(body) && typeof body.prompt === "string"
@@ -224,13 +175,19 @@ export async function POST(request: Request) {
     : "Cyberpunk";
 
   if (!prompt) {
-    return Response.json({ error: "Prompt is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Prompt is required." },
+      { status: 400 },
+    );
   }
 
   const apiKey = process.env.GROQ_API_KEY;
 
   if (!apiKey) {
-    return Response.json({ error: "Missing GROQ_API_KEY." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Missing GROQ_API_KEY." },
+      { status: 500 },
+    );
   }
 
   try {
@@ -286,7 +243,7 @@ Rules:
     const content = completion.choices[0]?.message.content;
 
     if (typeof content !== "string") {
-      return Response.json(
+      return NextResponse.json(
         { error: "AI returned invalid character data." },
         { status: 500 },
       );
@@ -297,29 +254,29 @@ Rules:
     try {
       parsed = JSON.parse(content);
     } catch {
-      return Response.json(
+      return NextResponse.json(
         { error: "AI returned invalid character data." },
         { status: 500 },
       );
     }
 
-    const character = normalizeCharacter(parsed, prompt);
+    const candidate = getCharacterCandidate(parsed);
 
-    if (!character) {
-      return Response.json(
+    if (!isAICharacterResponse(candidate)) {
+      return NextResponse.json(
         { error: "AI returned invalid character data." },
         { status: 500 },
       );
     }
 
-    return Response.json(cleanCharacter(character));
+    return NextResponse.json(normalizeCharacter(candidate));
   } catch (error) {
     console.error(
       "Groq character generation failed",
       JSON.stringify(safeErrorDetails(error)),
     );
 
-    return Response.json(
+    return NextResponse.json(
       { error: "AI returned invalid character data." },
       { status: 500 },
     );
