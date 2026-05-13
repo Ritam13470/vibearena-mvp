@@ -808,6 +808,7 @@ function SelectorCard({
 function StudioPanel({
   prompt,
   selectedStyle,
+  isGenerating,
   onPromptChange,
   onStyleChange,
   onGenerate,
@@ -816,6 +817,7 @@ function StudioPanel({
 }: {
   prompt: string;
   selectedStyle: string;
+  isGenerating: boolean;
   onPromptChange: (value: string) => void;
   onStyleChange: (value: string) => void;
   onGenerate: () => void;
@@ -827,13 +829,18 @@ function StudioPanel({
 
   return (
     <section className="glass-panel glow-border rounded-[1.6rem] p-4 sm:p-5">
-      <div>
-        <p className="text-[12px] font-black uppercase tracking-[0.3em] text-fuchsia-200/80">
-          AI Character Studio
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          Describe your character. Our AI will bring it to life.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[12px] font-black uppercase tracking-[0.3em] text-fuchsia-200/80">
+            AI Character Studio
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Describe your character. Our AI will bring it to life.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
+          AI Mode: Groq Text
+        </span>
       </div>
 
       <div className="mt-5">
@@ -915,17 +922,21 @@ function StudioPanel({
         <button
           type="button"
           onClick={onGenerate}
-          className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-cyan-200/30 bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#22d3ee] px-5 py-4 text-sm font-black text-white shadow-[0_0_38px_rgba(34,211,238,0.26)] transition hover:-translate-y-0.5 hover:shadow-[0_0_50px_rgba(168,85,247,0.36)]"
+          disabled={isGenerating}
+          className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border border-cyan-200/30 bg-gradient-to-r from-[#2563eb] via-[#7c3aed] to-[#22d3ee] px-5 py-4 text-sm font-black text-white shadow-[0_0_38px_rgba(34,211,238,0.26)] transition hover:-translate-y-0.5 hover:shadow-[0_0_50px_rgba(168,85,247,0.36)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
         >
           <span className="absolute inset-0 translate-x-[-120%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.48),transparent)] transition duration-700 group-hover:translate-x-[120%]" />
           <span className="relative">✦</span>
-          <span className="relative">Generate Character</span>
+          <span className="relative">
+            {isGenerating ? "Generating with AI..." : "Generate Character"}
+          </span>
         </button>
 
         <button
           type="button"
           onClick={onSurprise}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[#050816]/85 px-5 py-3.5 text-sm font-black text-slate-200 transition hover:border-fuchsia-300/35 hover:bg-fuchsia-300/10 hover:text-white"
+          disabled={isGenerating}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[#050816]/85 px-5 py-3.5 text-sm font-black text-slate-200 transition hover:border-fuchsia-300/35 hover:bg-fuchsia-300/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span aria-hidden="true">◇</span>
           Surprise Me
@@ -1117,12 +1128,14 @@ function CharacterVisual({ character }: { character: CharacterCard }) {
 function ResultPanel({
   card,
   liked,
+  isGenerating,
   onGenerate,
   onToggleLike,
   onStatus,
 }: {
   card: CharacterCard;
   liked: boolean;
+  isGenerating: boolean;
   onGenerate: () => void;
   onToggleLike: () => void;
   onStatus: (message: string) => void;
@@ -1165,9 +1178,10 @@ function ResultPanel({
             <button
               type="button"
               onClick={onGenerate}
-              className="min-w-[190px] flex-1 rounded-2xl border border-fuchsia-200/30 bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3.5 text-sm font-black text-white shadow-[0_0_30px_rgba(168,85,247,0.28)] transition hover:-translate-y-0.5"
+              disabled={isGenerating}
+              className="min-w-[190px] flex-1 rounded-2xl border border-fuchsia-200/30 bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3.5 text-sm font-black text-white shadow-[0_0_30px_rgba(168,85,247,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
-              Remix Character
+              {isGenerating ? "Generating with AI..." : "Remix Character"}
             </button>
             <button
               type="button"
@@ -1323,16 +1337,17 @@ export default function Home() {
   const [selectedStyle, setSelectedStyle] = useState("Cyberpunk");
   const [card, setCard] = useState<CharacterCard>(defaultCard);
   const [liked, setLiked] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [, setGenerationIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState(
-    "Frontend demo ready. Mock text and CSS visuals are local-only for now.",
+    "AI Mode: Groq Text is ready. CSS visuals remain local until image generation is connected.",
   );
 
   const promptSignal = useMemo(() => {
     return Math.min(100, Math.max(22, Math.round(prompt.trim().length * 1.7)));
   }, [prompt]);
 
-  function createNextCharacter(nextPrompt: string, messagePrefix: string) {
+  function createFallbackCharacter(nextPrompt: string) {
     setGenerationIndex((currentIndex) => {
       const nextIndex = currentIndex + 1;
       const nextCard = generateCharacter(
@@ -1344,22 +1359,56 @@ export default function Home() {
       setLiked(false);
       setCard(nextCard);
       setStatusMessage(
-        `${messagePrefix}: ${nextCard.name} (${nextCard.visualType}) generated locally. Future image prompt is prepared.`,
+        "AI generation failed, so VibeArena used local mock generation instead.",
       );
 
       return nextIndex;
     });
   }
 
-  function handleGenerate() {
-    const cleanPrompt = prompt.trim();
+  async function generateWithAi(nextPrompt: string) {
+    const cleanPrompt = nextPrompt.trim();
 
     if (!cleanPrompt) {
       alert("Please describe your character first.");
       return;
     }
 
-    createNextCharacter(cleanPrompt, "Generated mock character");
+    setIsGenerating(true);
+    setStatusMessage("Generating character text with Groq...");
+
+    try {
+      const response = await fetch("/api/generate-character", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: cleanPrompt,
+          style: selectedStyle,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Groq character generation failed.");
+      }
+
+      const nextCard = (await response.json()) as CharacterCard;
+
+      setLiked(false);
+      setCard(nextCard);
+      setStatusMessage(
+        `Real AI generated ${nextCard.name}. Image prompt prepared for future visual generation.`,
+      );
+    } catch {
+      createFallbackCharacter(cleanPrompt);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  function handleGenerate() {
+    void generateWithAi(prompt);
   }
 
   function handleSurprise() {
@@ -1367,7 +1416,7 @@ export default function Home() {
       surprisePrompts[Math.floor(Math.random() * surprisePrompts.length)];
 
     setPrompt(nextPrompt);
-    createNextCharacter(nextPrompt, "Surprise prompt loaded");
+    void generateWithAi(nextPrompt);
   }
 
   function handleStyleChange(style: string) {
@@ -1398,6 +1447,7 @@ export default function Home() {
             <StudioPanel
               prompt={prompt}
               selectedStyle={selectedStyle}
+              isGenerating={isGenerating}
               onPromptChange={setPrompt}
               onStyleChange={handleStyleChange}
               onGenerate={handleGenerate}
@@ -1408,6 +1458,7 @@ export default function Home() {
             <ResultPanel
               card={card}
               liked={liked}
+              isGenerating={isGenerating}
               onGenerate={handleGenerate}
               onToggleLike={() => {
                 setLiked((value) => !value);
