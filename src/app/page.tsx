@@ -28,6 +28,10 @@ type CharacterCard = {
   imageUrl?: string;
 };
 
+type GenerateImageApiResponse = {
+  imageUrl: string;
+};
+
 type Archetype = {
   names: string[];
   origins: string[];
@@ -429,6 +433,20 @@ function getRarity(score: number): Rarity {
   if (score >= 78) return "Epic";
   if (score >= 68) return "Rare";
   return "Common";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isImageGenerationResponse(
+  value: unknown,
+): value is GenerateImageApiResponse {
+  return (
+    isRecord(value) &&
+    typeof value.imageUrl === "string" &&
+    value.imageUrl.startsWith("data:image/")
+  );
 }
 
 function getPromptMotif(prompt: string) {
@@ -839,7 +857,7 @@ function StudioPanel({
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
-          AI Mode: Groq Text
+          AI Mode: Groq Text + OpenAI Image
         </span>
       </div>
 
@@ -1129,14 +1147,18 @@ function ResultPanel({
   card,
   liked,
   isGenerating,
+  isImageLoading,
   onGenerate,
+  onGenerateImage,
   onToggleLike,
   onStatus,
 }: {
   card: CharacterCard;
   liked: boolean;
   isGenerating: boolean;
+  isImageLoading: boolean;
   onGenerate: () => void;
+  onGenerateImage: () => void;
   onToggleLike: () => void;
   onStatus: (message: string) => void;
 }) {
@@ -1185,6 +1207,14 @@ function ResultPanel({
             </button>
             <button
               type="button"
+              onClick={onGenerateImage}
+              disabled={isImageLoading || isGenerating}
+              className="min-w-[190px] flex-1 rounded-2xl border border-cyan-200/30 bg-cyan-300/10 px-5 py-3.5 text-sm font-black text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.16)] transition hover:-translate-y-0.5 hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+            >
+              {isImageLoading ? "Creating image..." : "Generate AI Image"}
+            </button>
+            <button
+              type="button"
               onClick={onToggleLike}
               aria-label="Favorite character"
               className={`grid size-12 place-items-center rounded-2xl border text-lg font-black transition ${
@@ -1208,7 +1238,12 @@ function ResultPanel({
           </div>
         </div>
 
-        <CharacterVisual character={card} />
+        <div className="space-y-2">
+          <CharacterVisual character={card} />
+          <p className="text-center text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+            {card.imageUrl ? "AI image active" : "CSS fallback active"}
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -1338,9 +1373,10 @@ export default function Home() {
   const [card, setCard] = useState<CharacterCard>(defaultCard);
   const [liked, setLiked] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
   const [, setGenerationIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState(
-    "AI Mode: Groq Text is ready. CSS visuals remain local until image generation is connected.",
+    "AI Mode: Groq Text + OpenAI Image is ready. Generate images only when you choose.",
   );
 
   const promptSignal = useMemo(() => {
@@ -1398,7 +1434,7 @@ export default function Home() {
       setLiked(false);
       setCard(nextCard);
       setStatusMessage(
-        `Real AI generated ${nextCard.name}. Image prompt prepared for future visual generation.`,
+        `Real AI generated ${nextCard.name}. Image prompt is ready for OpenAI image generation.`,
       );
     } catch {
       createFallbackCharacter(cleanPrompt);
@@ -1409,6 +1445,66 @@ export default function Home() {
 
   function handleGenerate() {
     void generateWithAi(prompt);
+  }
+
+  async function handleGenerateImage() {
+    const imagePrompt = card.imagePrompt.trim();
+
+    if (!imagePrompt) {
+      setStatusMessage("No image prompt available yet. Generate a character first.");
+      return;
+    }
+
+    const targetName = card.name;
+    const targetVisualType = card.visualType;
+
+    setIsImageLoading(true);
+    setStatusMessage(`Creating OpenAI image for ${targetName}...`);
+
+    try {
+      const response = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imagePrompt,
+          characterName: targetName,
+          visualType: targetVisualType,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("OpenAI image generation failed.");
+      }
+
+      const data: unknown = await response.json();
+
+      if (!isImageGenerationResponse(data)) {
+        throw new Error("OpenAI image response was invalid.");
+      }
+
+      setCard((currentCard) => {
+        if (
+          currentCard.name !== targetName ||
+          currentCard.imagePrompt !== imagePrompt
+        ) {
+          return currentCard;
+        }
+
+        return {
+          ...currentCard,
+          imageUrl: data.imageUrl,
+        };
+      });
+      setStatusMessage(`AI image generated for ${targetName}.`);
+    } catch {
+      setStatusMessage(
+        "AI image generation failed, so VibeArena kept the CSS visual fallback.",
+      );
+    } finally {
+      setIsImageLoading(false);
+    }
   }
 
   function handleSurprise() {
@@ -1459,7 +1555,9 @@ export default function Home() {
               card={card}
               liked={liked}
               isGenerating={isGenerating}
+              isImageLoading={isImageLoading}
               onGenerate={handleGenerate}
+              onGenerateImage={() => void handleGenerateImage()}
               onToggleLike={() => {
                 setLiked((value) => !value);
                 setStatusMessage(
@@ -1475,7 +1573,11 @@ export default function Home() {
           <div className="grid gap-4 md:grid-cols-3">
             {[
               ["Prompt Signal", `${promptSignal}%`, "Clean creative input"],
-              ["Visual Type", visualThemes[card.visualType].label, "CSS fallback active"],
+              [
+                "Visual Type",
+                visualThemes[card.visualType].label,
+                card.imageUrl ? "AI image active" : "CSS fallback active",
+              ],
               ["Rarity Lock", card.rarity, "Current generation tier"],
             ].map(([label, value, hint]) => (
               <div
