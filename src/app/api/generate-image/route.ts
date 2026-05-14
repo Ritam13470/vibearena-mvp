@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -7,11 +6,6 @@ type GenerateImageRequest = {
   imagePrompt: string;
   characterName: string;
   visualType: string;
-};
-
-type OpenAIImageResult = {
-  b64_json?: string;
-  url?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,60 +40,58 @@ function parseGenerateImageRequest(value: unknown): GenerateImageRequest | null 
   };
 }
 
-function buildVibeArenaImagePrompt({
+function buildPollinationsPrompt({
   imagePrompt,
   characterName,
   visualType,
 }: GenerateImageRequest) {
   return [
-    imagePrompt,
-    `Character name: ${characterName}.`,
-    `Visual type: ${visualType}.`,
-    "Create a polished premium 3D game-character portrait for VibeArena.",
-    "Use a dark neon Solana arena style with purple, cyan, and green lighting.",
-    "Make it dramatic, high-quality, safe, non-sexual, and suitable for a game dashboard collectible card.",
-    "No text labels inside the image.",
-    "No logos and no marks that imitate real brands.",
+    `${characterName}, ${visualType} character.`,
+    "Premium 3D game character art, cyberpunk Solana arena, purple cyan green neon lighting, full body hero pose, high detail, no text labels, no watermark, safe non-sexual design.",
+    `Original prompt: ${imagePrompt}`,
   ].join(" ");
 }
 
-async function getDataUrlFromImage(image: OpenAIImageResult) {
-  if (typeof image.b64_json === "string" && image.b64_json.length > 0) {
-    if (image.b64_json.startsWith("data:image/")) {
-      return image.b64_json;
+function getPollinationsUrls(encodedPrompt: string) {
+  return [
+    `https://gen.pollinations.ai/image/${encodedPrompt}`,
+    `https://image.pollinations.ai/prompt/${encodedPrompt}`,
+  ];
+}
+
+async function fetchPollinationsImage(encodedPrompt: string) {
+  for (const imageUrl of getPollinationsUrls(encodedPrompt)) {
+    const response = await fetch(imageUrl, {
+      headers: {
+        Accept: "image/*",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      continue;
     }
 
-    return `data:image/png;base64,${image.b64_json}`;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+
+    if (!contentType.startsWith("image/")) {
+      continue;
+    }
+
+    return {
+      contentType,
+      imageBuffer: Buffer.from(await response.arrayBuffer()),
+    };
   }
 
-  if (typeof image.url !== "string" || !image.url) {
-    return null;
-  }
-
-  const imageResponse = await fetch(image.url);
-
-  if (!imageResponse.ok) {
-    return null;
-  }
-
-  const contentType = imageResponse.headers.get("content-type") ?? "image/png";
-  const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-
-  return `data:${contentType};base64,${imageBuffer.toString("base64")}`;
+  return null;
 }
 
 function safeErrorDetails(error: unknown) {
   if (error instanceof Error) {
-    const details = error as Error & {
-      status?: number;
-      code?: string;
-    };
-
     return {
-      name: details.name,
-      message: details.message.slice(0, 240),
-      status: typeof details.status === "number" ? details.status : undefined,
-      code: typeof details.code === "string" ? details.code : undefined,
+      name: error.name,
+      message: error.message.slice(0, 240),
     };
   }
 
@@ -110,7 +102,6 @@ function safeErrorDetails(error: unknown) {
   return {
     name: typeof error.name === "string" ? error.name : "UnknownError",
     status: typeof error.status === "number" ? error.status : undefined,
-    code: typeof error.code === "string" ? error.code : undefined,
   };
 }
 
@@ -135,41 +126,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Missing OPENAI_API_KEY." },
-      { status: 500 },
-    );
-  }
-
   try {
-    const openai = new OpenAI({ apiKey });
-    const response = await openai.images.generate({
-      model: "gpt-image-1-mini",
-      prompt: buildVibeArenaImagePrompt(imageRequest),
-      n: 1,
-      size: "1024x1024",
-      quality: "low",
-      output_format: "png",
-      moderation: "auto",
-    });
+    const encodedPrompt = encodeURIComponent(
+      buildPollinationsPrompt(imageRequest),
+    );
+    const image = await fetchPollinationsImage(encodedPrompt);
 
-    const image = response.data?.[0];
-    const imageUrl = image ? await getDataUrlFromImage(image) : null;
-
-    if (!imageUrl) {
+    if (!image) {
       return NextResponse.json(
         { error: "Image generation failed." },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ imageUrl });
+    const imageUrl = `data:${image.contentType};base64,${image.imageBuffer.toString(
+      "base64",
+    )}`;
+
+    return NextResponse.json({
+      imageUrl,
+      provider: "pollinations",
+    });
   } catch (error) {
     console.error(
-      "OpenAI image generation failed",
+      "Pollinations image generation failed",
       JSON.stringify(safeErrorDetails(error)),
     );
 

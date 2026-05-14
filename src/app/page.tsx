@@ -857,7 +857,7 @@ function StudioPanel({
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
-          AI Mode: Groq Text + OpenAI Image
+          AI Mode: Groq Text + Free Image
         </span>
       </div>
 
@@ -1376,7 +1376,7 @@ export default function Home() {
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [, setGenerationIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState(
-    "AI Mode: Groq Text + OpenAI Image is ready. Generate images only when you choose.",
+    "AI Mode: Groq Text + Free Image is ready. Generate images only when you choose.",
   );
 
   const promptSignal = useMemo(() => {
@@ -1434,7 +1434,7 @@ export default function Home() {
       setLiked(false);
       setCard(nextCard);
       setStatusMessage(
-        `Real AI generated ${nextCard.name}. Image prompt is ready for OpenAI image generation.`,
+        `Real AI generated ${nextCard.name}. Image prompt is ready for free image generation.`,
       );
     } catch {
       createFallbackCharacter(cleanPrompt);
@@ -1459,7 +1459,7 @@ export default function Home() {
     const targetVisualType = card.visualType;
 
     setIsImageLoading(true);
-    setStatusMessage(`Creating OpenAI image for ${targetName}...`);
+    setStatusMessage(`Creating free AI image for ${targetName}...`);
 
     try {
       const response = await fetch("/api/generate-image", {
@@ -1475,13 +1475,13 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error("OpenAI image generation failed.");
+        throw new Error("Free AI image generation failed.");
       }
 
       const data: unknown = await response.json();
 
       if (!isImageGenerationResponse(data)) {
-        throw new Error("OpenAI image response was invalid.");
+        throw new Error("Free AI image response was invalid.");
       }
 
       setCard((currentCard) => {
@@ -1497,10 +1497,10 @@ export default function Home() {
           imageUrl: data.imageUrl,
         };
       });
-      setStatusMessage(`AI image generated for ${targetName}.`);
+      setStatusMessage(`Free AI image generated for ${targetName}.`);
     } catch {
       setStatusMessage(
-        "AI image generation failed, so VibeArena kept the CSS visual fallback.",
+        "Free AI image generation failed, so VibeArena kept the CSS visual fallback.",
       );
     } finally {
       setIsImageLoading(false);
