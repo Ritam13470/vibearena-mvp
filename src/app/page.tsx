@@ -1,7 +1,13 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useId, useMemo, useState, type CSSProperties } from "react";
+import {
+  useId,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+} from "react";
 
 type Rarity = "Common" | "Rare" | "Epic" | "Legendary" | "Mythic";
 
@@ -1046,26 +1052,137 @@ function ScoreRarityCards({ card }: { card: CharacterCard }) {
 
 function CharacterVisual({ character }: { character: CharacterCard }) {
   const theme = visualThemes[character.visualType];
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const visualStyle = {
     "--visual-primary": theme.primary,
     "--visual-secondary": theme.secondary,
     "--visual-accent": theme.accent,
   } as CSSProperties;
+  const generatedVisualStyle = {
+    ...visualStyle,
+    "--tilt-x": `${tilt.x}deg`,
+    "--tilt-y": `${tilt.y}deg`,
+  } as CSSProperties;
+
+  function handleGeneratedStageMouseMove(event: MouseEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const pointerX = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const pointerY = (event.clientY - bounds.top) / bounds.height - 0.5;
+    const motionScale = window.innerWidth < 768 ? 0.35 : 1;
+
+    setTilt({
+      x: Number((-pointerY * 8 * motionScale).toFixed(2)),
+      y: Number((pointerX * 10 * motionScale).toFixed(2)),
+    });
+  }
+
+  function resetGeneratedStageTilt() {
+    setTilt({ x: 0, y: 0 });
+  }
 
   if (character.imageUrl) {
     return (
-      <div className="character-stage generated-image-stage relative min-h-[520px] overflow-hidden rounded-[1.6rem] border border-cyan-300/20 bg-[#030712] shadow-[inset_0_0_80px_rgba(34,211,238,0.08),0_0_70px_rgba(124,58,237,0.16)] sm:min-h-[620px]">
-        <img
-          src={character.imageUrl}
-          alt={`${character.name} generated character`}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(2,6,23,0.45))]" />
-        <div className="absolute left-5 top-5 rounded-2xl border border-cyan-300/20 bg-black/45 px-4 py-3 backdrop-blur-xl">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/75">
-            AI Image Ready
+      <div
+        className={`character-stage generated-image-stage ai-image-premium-stage visual-${character.visualType} relative min-h-[520px] overflow-hidden rounded-[1.6rem] border border-cyan-300/20 bg-[#030712] shadow-[inset_0_0_80px_rgba(34,211,238,0.08),0_0_70px_rgba(124,58,237,0.16)] sm:min-h-[620px]`}
+        style={generatedVisualStyle}
+        onMouseMove={handleGeneratedStageMouseMove}
+        onMouseLeave={resetGeneratedStageTilt}
+        aria-label={`${character.name} ${theme.label} animated AI image stage`}
+      >
+        <div className="ai-stage-backdrop" />
+        <div className="cyber-grid absolute inset-0 z-[1] opacity-35" />
+        <div className="ai-stage-smoke" />
+        <div className="ai-stage-arena-ring" />
+        <div className="ai-stage-arena-ring ai-stage-arena-ring-secondary" />
+        <div className="ai-power-column" />
+        <div className="ai-summon-ring" />
+        <div className="ai-spotlight-sweep" />
+        <div className="ai-stage-lightning ai-stage-lightning-one" />
+        <div className="ai-stage-lightning ai-stage-lightning-two" />
+
+        {Array.from({ length: 22 }).map((_, index) => (
+          <span
+            key={`stage-particle-${index}`}
+            className="ai-stage-particle"
+            style={{
+              left: `${6 + ((index * 23) % 88)}%`,
+              top: `${8 + ((index * 31) % 78)}%`,
+              animationDelay: `${index * 0.17}s`,
+              animationDuration: `${4.4 + (index % 5) * 0.45}s`,
+            }}
+          />
+        ))}
+
+        <div className="ai-hologram-card">
+          <div className="ai-aura-field" aria-hidden="true">
+            <span className="ai-aura ai-aura-one" />
+            <span className="ai-aura ai-aura-two" />
+            <span className="ai-aura ai-aura-three" />
+          </div>
+          <div className="ai-image-shell">
+            <div className="ai-character-breathe">
+              <img
+                src={character.imageUrl}
+                alt={`${character.name} generated character`}
+                className="ai-stage-image"
+              />
+            </div>
+            <div className="ai-image-vignette" />
+            <div className="ai-eye-glow-layer" aria-hidden="true">
+              <span className="ai-eye-glow ai-eye-glow-left" />
+              <span className="ai-eye-glow ai-eye-glow-right" />
+            </div>
+            <div className="ai-scanlines" />
+            <div className="ai-hologram-distortion" />
+            {Array.from({ length: 3 }).map((_, index) => (
+              <span
+                key={`arc-${index}`}
+                className={`ai-lightning-arc ai-lightning-arc-${index + 1}`}
+              />
+            ))}
+            {Array.from({ length: 12 }).map((_, index) => (
+              <span
+                key={`front-spark-${index}`}
+                className="ai-front-spark"
+                style={{
+                  left: `${12 + ((index * 17) % 76)}%`,
+                  bottom: `${5 + ((index * 11) % 42)}%`,
+                  animationDelay: `${index * 0.22}s`,
+                }}
+              />
+            ))}
+            {Array.from({ length: 6 }).map((_, index) => (
+              <span
+                key={`energy-streak-${index}`}
+                className="ai-energy-streak"
+                style={{
+                  left: `${8 + ((index * 19) % 82)}%`,
+                  top: `${18 + ((index * 23) % 58)}%`,
+                  animationDelay: `${index * 0.38}s`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="ai-stage-label left-4 top-4 sm:left-5 sm:top-5">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/80">
+            AI IMAGE ACTIVE
           </p>
-          <p className="mt-1 text-sm font-black text-white">{theme.label}</p>
+          <p className="mt-1 text-base font-black text-white">{theme.label}</p>
+          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-100/70">
+            2.5D motion stage
+          </p>
+        </div>
+
+        <div className="ai-energy-badge">
+          <SolanaMark className="h-8 w-8" />
+          <span>{theme.symbol}</span>
+        </div>
+
+        <div className="ai-stage-readout">
+          <span>{theme.holoLabel}</span>
+          <strong>{theme.holoValue}</strong>
         </div>
       </div>
     );
@@ -1077,6 +1194,11 @@ function CharacterVisual({ character }: { character: CharacterCard }) {
       style={visualStyle}
       aria-label={`${character.name} ${theme.label} CSS visual`}
     >
+      <div className="absolute bottom-4 left-4 z-30 rounded-2xl border border-cyan-300/20 bg-black/35 px-4 py-2.5 backdrop-blur-xl">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100/75">
+          CSS FALLBACK ACTIVE
+        </p>
+      </div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_48%_28%,rgba(34,211,238,0.22),transparent_26%),radial-gradient(circle_at_62%_42%,rgba(168,85,247,0.22),transparent_31%),radial-gradient(circle_at_50%_92%,rgba(20,241,149,0.14),transparent_28%)]" />
       <div className="cyber-grid absolute inset-0 opacity-45" />
       <div className="stage-fog" />
@@ -1162,6 +1284,8 @@ function ResultPanel({
   onToggleLike: () => void;
   onStatus: (message: string) => void;
 }) {
+  const theme = visualThemes[card.visualType];
+
   return (
     <section className="glass-panel glow-border rounded-[1.6rem] p-4 sm:p-5">
       <div className="grid gap-5 xl:grid-cols-[minmax(290px,0.78fr)_minmax(440px,1.22fr)]">
@@ -1241,7 +1365,9 @@ function ResultPanel({
         <div className="space-y-2">
           <CharacterVisual character={card} />
           <p className="text-center text-xs font-black uppercase tracking-[0.18em] text-slate-500">
-            {card.imageUrl ? "AI image active" : "CSS fallback active"}
+            {card.imageUrl
+              ? `AI IMAGE ACTIVE / ${theme.label} / 2.5D motion stage`
+              : "CSS FALLBACK ACTIVE"}
           </p>
         </div>
       </div>
@@ -1470,7 +1596,14 @@ export default function Home() {
         body: JSON.stringify({
           imagePrompt,
           characterName: targetName,
+          origin: card.origin,
+          power: card.power,
+          weakness: card.weakness,
+          catchphrase: card.catchphrase,
+          rarity: card.rarity,
           visualType: targetVisualType,
+          stylePreset: selectedStyle,
+          originalPrompt: prompt,
         }),
       });
 
@@ -1576,7 +1709,7 @@ export default function Home() {
               [
                 "Visual Type",
                 visualThemes[card.visualType].label,
-                card.imageUrl ? "AI image active" : "CSS fallback active",
+                card.imageUrl ? "AI IMAGE ACTIVE" : "CSS FALLBACK ACTIVE",
               ],
               ["Rarity Lock", card.rarity, "Current generation tier"],
             ].map(([label, value, hint]) => (
